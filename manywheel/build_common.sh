@@ -418,11 +418,12 @@ if [[ -n "$PYTORCH_FINAL_PACKAGE_DIR" ]]; then
     fi
 fi
 
+# 你删什么呢你删？
 # remove stuff before testing
-rm -rf /opt/rh
-if ls /usr/local/cuda* >/dev/null 2>&1; then
-    rm -rf /usr/local/cuda*
-fi
+# rm -rf /opt/rh
+# if ls /usr/local/cuda* >/dev/null 2>&1; then
+#     rm -rf /usr/local/cuda*
+# fi
 
 
 # Test that all the wheels work
