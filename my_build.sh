@@ -7,7 +7,7 @@ sudo gpasswd -a haswell docker
 newgrp docker
 
 echo `{
-  "data-root": "/mydata/docker"
+  "data-root": "/opt/docker"
 }` > /etc/docker/daemon.json
 
 sudo systemctl restart docker
@@ -17,7 +17,7 @@ sudo systemctl restart docker
 # --------------------------------------------------
 # TODO: change it
 # set DIR 
-BUILDER_WORK_DIR="/mydata/torch/v110"
+BUILDER_WORK_DIR="/opt/torch/v110"
 PYTORCH_TAG="v1.10.2"
 PYTORCH_BUILD_VERSION="1.10.2"
 # BUILDER_WORK_DIR="/opt/tt"
@@ -35,22 +35,29 @@ sudo mkdir -p $BUILDER_WORK_DIR
 cd $BUILDER_WORK_DIR
 # 注意权限
 
-git clone https://github.com/pytorch/builder
+
+git clone https://github.com/haswelliris/builder
 cd builder
 git checkout $BUILDER_TAG
 git submodule update --init --recursive
 # 要手动改builder/manywheel/build_cuda.sh USE_STATIC_NCCL=0
+# v1.12.1
 # sed -i '/USE_STATIC_NCCL/s/1/0/g' manywheel/build_cuda.sh 
+# v1.10.2
 sed -i '/USE_STATIC_NCCL/s/1/0/g' manywheel/build.sh 
+# MUST CHANGE IT
+sed -i '/NCCL_ROOT_DIR/s/\/usr\/local\/cuda/\/weka-jd\/prod\/platform_team\/zly\/lib\/nccl\/2.14.3_cu113/g' manywheel/build.sh 
 # 要手动改builder/manywheel/build_cuda.sh USE_STATIC_NCCL=0
+# 要手动改builder/manywheel/build_cuda.sh NCCL_ROOT_DIR=0
 GPU_ARCH_TYPE=$GPU_ARCH_TYPE GPU_ARCH_VERSION=$GPU_ARCH_VERSION manywheel/build_docker.sh
 cd ..
 
 
 
-git clone https://github.com/pytorch/pytorch
+git clone https://github.com/haswelliris/pytorch
 cd pytorch
-CIRCLE_SHA1=$((git rev-parse HEAD))
+git checkout $PYTORCH_TAG
+CIRCLE_SHA1=$(git rev-parse HEAD)
 git submodule update --init --recursive
 git rev-parse HEAD
 # python setup.py clean # builder会清理
@@ -79,14 +86,17 @@ BINARY_ENV_FILE=/tmp/env
 if [[ $PYTORCH_TAG == "v1.10.2" ]]; then
   BINARY_ENV_FILE=//env
 fi
-# DOCKER_IMAGE=pytorch/manylinux-builder:cuda11.3-1.10
+#--------------------------------------------------------------
+DOCKER_IMAGE=pytorch/manylinux-builder:cuda11.3-1.10
 # DOCKER_IMAGE=pytorch/manylinux-cuda113:latest
-DOCKER_IMAGE=pytorch/manylinux-builder:cuda11.3
+# DOCKER_IMAGE=pytorch/manylinux-builder:cuda11.3
+#--------------------------------------------------------------
 
 # GEN NCCL CONFIG
 NCCL_GLOBAL_DIR="/weka-jd/prod/platform_team/zly/lib/nccl/2.14.3_cu113"
 NCCL_ENV_FILE="${NCCL_GLOBAL_DIR}/nccl_env.sh"
 NCCL_ENV_FILE_HOSTPATH="${GITHUB_WORKSPACE}/nccl/nccl_env.sh"
+#--------------------------------------------------------------
 echo "export NCCL_INCLUDE_DIR=${NCCL_GLOBAL_DIR}/include" > ${NCCL_ENV_FILE_HOSTPATH}
 echo "export NCCL_LIB_DIR=${NCCL_GLOBAL_DIR}/lib" >> ${NCCL_ENV_FILE_HOSTPATH}
 echo "export NCCL_ROOT_DIR=${NCCL_GLOBAL_DIR}" >> ${NCCL_ENV_FILE_HOSTPATH}
@@ -96,6 +106,9 @@ echo "export NCCL_ROOT_DIR=${NCCL_GLOBAL_DIR}" >> ${NCCL_ENV_FILE_HOSTPATH}
 # 要手动改builder/manywheel/build_cuda.sh NCCL_ROOT_DIR=0
 echo "export USE_STATIC_NCCL=0" >> ${NCCL_ENV_FILE_HOSTPATH}
 echo "export USE_SYSTEM_NCCL=1" >> ${NCCL_ENV_FILE_HOSTPATH}
+#--------------------------------------------------------------
+# echo "export CUDA_HOME=/usr/local/cuda" >> ${NCCL_ENV_FILE_HOSTPATH}
+# echo "export CPATH=\"/usr/local/cuda/include:$CPATH\"" >> ${NCCL_ENV_FILE_HOSTPATH}
 
 #GEN ENV file
 DOCKER_ENV_FILENAME="my_env.env"
@@ -142,7 +155,11 @@ container_name=$(docker run \
     "${DOCKER_IMAGE}"
 )
 docker exec -t -w "${PYTORCH_ROOT}" "${container_name}" bash -c "bash .circleci/scripts/binary_populate_env.sh"
+
+# docker exec -t "${container_name}" bash -c "source ${BINARY_ENV_FILE} && export CIRCLE_TAG=$PYTORCH_TAG && bash /builder/manywheel/build.sh"
+# for v1.10.2
 docker exec -t "${container_name}" bash -c "source ${BINARY_ENV_FILE} && source ${NCCL_ENV_FILE} && bash /builder/manywheel/build.sh"
 # docker exec -t "${container_name}" bash -c "bash /builder/manywheel/build.sh"
-# for PYTORCH_TAG == v1.10.2
+
+# for PYTORCH_TAG == v1.12
 # docker exec -t "${container_name}" bash -c "source /env && source ${NCCL_ENV_FILE} && bash /builder/manywheel/build.sh"
