@@ -7,7 +7,7 @@ FROM centos:7 as base
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US.UTF-8
-
+RUN yum install ca-certificates -y && update-ca-trust force-enable && update-ca-trust extract
 RUN yum install -y wget curl perl util-linux xz bzip2 git patch which perl zlib-devel
 RUN yum install -y yum-utils centos-release-scl
 RUN yum-config-manager --enable rhel-server-rhscl-7-rpms
